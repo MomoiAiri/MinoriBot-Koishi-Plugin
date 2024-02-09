@@ -68,7 +68,7 @@ function scheduleTask(date:Date,callback:()=>void):void{
         console.log('目标已过时');
     }
 }
-function sendRemindMessage(ctx:Context,channel:Channel[],message:Array<Element|string>){
+function sendRemindMessage(ctx:Context,channel:Channel[],message:Array<h|string>){
     for(let i =0;i<channel.length;i++){
         if(channel[i].usingVirtualLiveRemind){
             ctx.bots[`${channel[i].platform}:${channel[i].assignee}`].sendMessage(channel[i].id,message)
@@ -81,9 +81,9 @@ export async function checkVirtualLives(ctx:Context,channel:Channel[]){
     await getVirtualLiveList();
     let cvl = getCurrentVirtualLives();
     let testvl = new SekaiVirtualLive();
-    testvl.id=1;
-    testvl.name='testvl';
-    cvl.push(testvl);
+    // testvl.id=1;
+    // testvl.name='testvl';
+    // cvl.push(testvl);
     // console.log(`[Interval] 进入了一次提醒检测函数,当前有${cvl.length}场演唱会`);
     if(cvl){
         for(let i = 0;i<cvl.length;i++){
