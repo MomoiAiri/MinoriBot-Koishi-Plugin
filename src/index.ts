@@ -6,6 +6,8 @@ import { paresMessageList, sendByDataType } from './utils'
 import { commandChart } from './command/searchChart'
 import { checkVirtualLives } from './utils/virtualLiveReminder'
 import { text } from 'stream/consumers'
+import { GeminiClient } from './command/gemini'
+import moment from 'moment';
 require('./utils/virtualLiveReminder')
 
 export const name = 'minoribot'
@@ -38,44 +40,41 @@ export interface Config {
   commandPrefix:string
   backendUrl:string
   backendProjectUrl:string
+  gemini_APIKey:string
+  gemini_proxy:string
 }
+
+export let context:Context = undefined
+let gemini:GeminiClient
 
 export const Config: Schema<Config> = Schema.object({
   commandPrefix: Schema.string().default('sk').description('指令前缀，用于解决指令多插件冲突的问题'),
   backendUrl: Schema.string().default('http://yue.momoiairi.fun:18080').description('后端服务器地址'),
-  backendProjectUrl: Schema.string().default('https://github.com/MomoiAiri/MinoriBot').description('后端服务器项目地址，可自行搭建').disabled()
+  backendProjectUrl: Schema.string().default('https://github.com/MomoiAiri/MinoriBot').description('后端服务器项目地址，可自行搭建').disabled(),
+  gemini_APIKey: Schema.string().default('').description('gemini API Key'),
+  gemini_proxy: Schema.string().description('gemini 代理地址，可解决无法访问 gemini 的问题').default('http://127.0.0.1:7890')
 })
 
 export function apply(ctx: Context,config: Config) {
   // write your plugin here
+  context = ctx
   async function interval(){
     if(isInterval){
       const channels:Channel[] = await ctx.database.get('channel',{});
       checkVirtualLives(ctx,channels);
     }
   }
-  async function test_addDB(){
-    const VirtualLive:VirtualLive[] = await ctx.database.get('virtualLive',{});
-    const now = Date.now();
-    let vlschedules:any = []
-    vlschedules.push({
-      schedulesid:1,
-      virtualLiveId:1,
-      startAt:now+6*60*1000,
-      endAt:now+7*60*1000,
-      reminded:false
-    });
-    vlschedules.push({
-      schedulesid:2,
-      virtualLiveId:1,
-      startAt:now+12*60*1000,
-      endAt:now+13*60*1000,
-      reminded:false
-    })
-    ctx.database.set('virtualLive',1,{virtualLiveSchedules:vlschedules});
+  
+  // ctx.setInterval(interval,60*1000);
+  setInterval(interval,60*1000);
+
+  function init(){
+    if(config.gemini_APIKey!=''){
+      gemini = new GeminiClient(config.gemini_APIKey,config.gemini_proxy)
+    }
   }
   
-  ctx.setInterval(interval,60*1000);
+  init()
 
   ctx.model.extend('channel',{
     usingVirtualLiveRemind:{type:'boolean',initial:false,nullable:false},
@@ -90,11 +89,9 @@ export function apply(ctx: Context,config: Config) {
   })
 
   ctx.middleware((session,next)=>{
-    console.log(`[${session.channelId}][${session.event.member?.nick}]${session.content}`)
-    if(session.content=='插入数据'){
-      test_addDB();
-      return '插入成功';
-    }
+    const messageTime:string = `[${moment(new Date()).format('YYYY-MM-DD HH:mm')}]`;
+    console.log(`${messageTime}[${session.channelId}][${session.event.user.name}]${session.content}`)
+    // console.log(session)
     return next();
   })
 
@@ -184,4 +181,29 @@ export function apply(ctx: Context,config: Config) {
       }
     }
   })
+  ctx.command('gmn [msg:text]','Gemini对话')
+  .action(async({session},msg)=>{
+    console.log(msg)
+    const result = await gemini.textDialogue(msg)
+    session.send(result)
+  })
+  ctx.command('gmn-p [msg:string] [...image:image]','Gemini图片对话')
+  .action(async ({session},msg,...image)=>{
+    if(image!=undefined && msg != undefined){
+      session.send(`本次会话共有${image.length}张图`)
+      const result = await gemini.textAndImageDialogue(msg,image)
+      session.send(result);
+    }
+  })
+  ctx.command('gmn-d [msg:text]','Genmini长对话')
+  .action(async({session},msg)=>{
+    const result = await gemini.longDilogue(msg)
+    session.send(result)
+  })
+  ctx.command('gmn-r','重置长对话')
+  .action((_)=>{
+    gemini.resetChat()
+    return '已重置'
+  })
+
 }
