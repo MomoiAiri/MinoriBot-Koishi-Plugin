@@ -2,15 +2,29 @@ import { Context, Schema, h ,Bot, Channel, sleep, Database} from 'koishi'
 import { commandCard, commandCardIll } from './command/searchCard'
 import { commandEvent } from './command/searchEvent'
 import { commandMusic } from './command/searchMusic'
-import { paresMessageList, sendByDataType } from './utils'
+import { paresMessageList, replaceImgTags, sendByDataType } from './utils'
 import { commandChart } from './command/searchChart'
 import { checkVirtualLives } from './utils/virtualLiveReminder'
 import { text } from 'stream/consumers'
 import { GeminiClient } from './command/gemini'
-import moment from 'moment';
+import moment from 'moment'
+import Puppeteer from 'koishi-plugin-puppeteer'
+import Colors = require('colors.ts');
+import { commandGacha } from './command/searchGacha'
+import { SekaiEvent } from './types/SekaiEvent'
+import { checkEventEndTime } from './utils/eventEndReminder'
 require('./utils/virtualLiveReminder')
 
+Colors.theme({
+  red:"red",
+  green:"green",
+  blue:"blue",
+  lightblue:"lightblue",
+  pink:"pink",
+})
+
 export const name = 'minoribot'
+export const inject = ['puppeteer']
 const isInterval = true
 
 declare module 'koishi'{
@@ -19,6 +33,7 @@ declare module 'koishi'{
   }
   interface Tables{
     virtualLive:VirtualLive,
+    projectSekaiData:ProjectSekaiData,
   }
 }
 
@@ -34,6 +49,11 @@ export interface VirtualLive{
     endAt:string
     reminded:boolean
   }[]
+}
+
+export interface ProjectSekaiData{
+  id:number
+  event:SekaiEvent
 }
 
 export interface Config {
@@ -62,15 +82,17 @@ export function apply(ctx: Context,config: Config) {
     if(isInterval){
       const channels:Channel[] = await ctx.database.get('channel',{});
       checkVirtualLives(ctx,channels);
+      checkEventEndTime(ctx,channels);
     }
   }
-  
-  // ctx.setInterval(interval,60*1000);
-  setInterval(interval,60*1000);
+  ctx.setInterval(interval,60*1000);
 
   function init(){
     if(config.gemini_APIKey!=''){
       gemini = new GeminiClient(config.gemini_APIKey,config.gemini_proxy)
+    }
+    else{
+      gemini = undefined
     }
   }
   
@@ -88,15 +110,28 @@ export function apply(ctx: Context,config: Config) {
     virtualLiveSchedules:'json'
   })
 
+  ctx.model.extend('projectSekaiData',{
+    id:'unsigned',
+    event:'json'
+  },
+  {
+    primary:'id',
+    autoInc:true
+  })
+
   ctx.middleware((session,next)=>{
-    const messageTime:string = `[${moment(new Date()).format('YYYY-MM-DD HH:mm')}]`;
-    console.log(`${messageTime}[${session.channelId}][${session.event.user.name}]${session.content}`)
-    // console.log(session)
+    const messageTime:string = `[${moment(new Date()).format('YYYY-MM-DD HH:mm')}]`.colors('#99eedd');
+    const userName = (session.event.user.name?session.event.user.name:session.event.member.nick).colors('#ffccaa')
+    const content = replaceImgTags(session.content)
+    console.log(`${messageTime}[${session.channelId.colors('#99ccff')}][${session.event.channel.name.toString().colors('#ffaacc')}][${userName}]${content}`)
     return next();
   })
 
-  ctx.command('测试 text1:string text2:string')
-  .action((_,text1,text2)=> {return text1 + text2})
+  ctx.command('interval')
+  .action(({session})=> {
+    interval()
+    return '执行了一次Interval'
+  })
 
   ctx.command('echo text:string')
   .action((_,text)=>{return text})
@@ -117,6 +152,14 @@ export function apply(ctx: Context,config: Config) {
   .action(async({session},text)=>{
     const data = await commandEvent(config.backendUrl,text);
     return paresMessageList(data);
+  })
+
+  ctx.command(`${config.commandPrefix}查卡池 <id:integer>`,'查卡池')
+  .usage('根据卡池ID查曲活动卡池信息')
+  .example('sk查卡池 114 ： 返回卡池ID为114的卡池信息')
+  .action(async({session},id)=>{
+    const data = await commandGacha(config.backendUrl,id.toString());
+    return paresMessageList(data)
   })
 
   ctx.command(`${config.commandPrefix}查卡面 <id:integer>`,'查卡面')
@@ -144,8 +187,10 @@ export function apply(ctx: Context,config: Config) {
     return paresMessageList(data);
   })
 
+
   ctx.command('演唱会提醒 <word:text>','开关虚拟演唱会提醒功能')
   .usage('开关虚拟演唱会提醒功能，需要管理员权限')
+  .alias('ych')
   .example('演唱会提醒 开启：开启提醒功能')
   .example('演唱会提醒 关闭：关闭提醒功能')
   .channelFields(['usingVirtualLiveRemind'])
@@ -160,6 +205,7 @@ export function apply(ctx: Context,config: Config) {
     const hasRequiredRole = roles.includes('admin') || roles.includes('owner');
     if(session.user.authority>1||hasRequiredRole){
       switch(text){
+        case 'on':
         case '开启':
           if(session.channel.usingVirtualLiveRemind==true){
             session.send('功能已开启无序再次开启')
@@ -169,6 +215,7 @@ export function apply(ctx: Context,config: Config) {
             session.send('虚拟演唱会提醒已开启');
           }
           break;
+        case 'off':
         case '关闭':
           if(session.channel.usingVirtualLiveRemind==false){
             session.send('功能已关闭无序再次关闭')
@@ -197,13 +244,19 @@ export function apply(ctx: Context,config: Config) {
   })
   ctx.command('gmn-d [msg:text]','Genmini长对话')
   .action(async({session},msg)=>{
-    const result = await gemini.longDilogue(msg)
-    session.send(result)
+    const result = await gemini.longDilogue(msg,ctx)
+    if(typeof result == 'string'){
+      session.send(result)
+    }
+    else{
+      session.send(h.image(result,'image/jpeg'))
+    }
   })
   ctx.command('gmn-r','重置长对话')
   .action((_)=>{
     gemini.resetChat()
     return '已重置'
   })
-
+  
+  
 }
