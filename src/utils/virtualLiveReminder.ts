@@ -56,19 +56,7 @@ function getCurrentVirtualLives():SekaiVirtualLive[]{
     return undefined;
 }
 
-function scheduleTask(date:Date,callback:()=>void):void{
-    const now =new Date();
-    const targetTime = date;
-    const delay = targetTime.getTime()-now.getTime();
-    if(delay>0){
-        setTimeout(()=>{callback()},delay);
-        console.log(`[scheduleTask] 已设置时间为${date}的定时任务`)
-    }
-    else{
-        console.log('目标已过时');
-    }
-}
-function sendRemindMessage(ctx:Context,channel:Channel[],message:Array<h|string>){
+export function sendRemindMessage(ctx:Context,channel:Channel[],message:Array<h|string>){
     for(let i =0;i<channel.length;i++){
         if(channel[i].usingVirtualLiveRemind){
             ctx.bots[`${channel[i].platform}:${channel[i].assignee}`].sendMessage(channel[i].id,message)
@@ -80,7 +68,7 @@ function sendRemindMessage(ctx:Context,channel:Channel[],message:Array<h|string>
 export async function checkVirtualLives(ctx:Context,channel:Channel[]){
     await getVirtualLiveList();
     let cvl = getCurrentVirtualLives();
-    let testvl = new SekaiVirtualLive();
+    // let testvl = new SekaiVirtualLive();
     // testvl.id=1;
     // testvl.name='testvl';
     // cvl.push(testvl);
@@ -126,7 +114,7 @@ export async function checkVirtualLives(ctx:Context,channel:Channel[]){
                         catch(e){
                             console.error('获取LiveBanner失败');
                         }
-                        messageList.push(`Title: ${tempvl.name}\n该演唱会快要开始了，还没有看的记得去看`);
+                        messageList.push(`Title: ${tempvl.name}\n该演唱会快要开始了，别忘了拿300石头哦`);
                         sendRemindMessage(ctx,channel,messageList);
                         //更新数据库内信息
                         scheduleList[j].reminded=true;

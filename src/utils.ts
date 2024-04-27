@@ -65,3 +65,8 @@ export function paresMessageList(msg:receiveBody): Array<Element | string> {
     }
     return messageList
   }
+
+  export function replaceImgTags(input: string): string {
+    const regex = /<img.*?\/>/gi;
+    return input.replace(regex, '[图片]');
+}

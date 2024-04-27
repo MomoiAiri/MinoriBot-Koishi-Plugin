@@ -1,5 +1,8 @@
 import {ChatSession, EnhancedGenerateContentResponse, GenerateContentResult, GenerationConfig, GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SafetySetting,ModelParams, GenerativeModel} from '@google/generative-ai'
+import Puppeteer from 'koishi-plugin-puppeteer'
 import {setGlobalDispatcher, ProxyAgent} from 'undici'
+import {Context} from 'koishi'
+import { getScreenShot } from '../utils/puppeteer'
 
 
 interface chatHistory{
@@ -16,7 +19,16 @@ export class GeminiClient{
     dispatcher:ProxyAgent
     genAi:GoogleGenerativeAI
     model:GenerativeModel
-    ch:chatHistory = {history:[],generationConfig:{maxOutputTokens:100000}}
+    ch:chatHistory = {history:[
+        {
+            role:'user',
+            parts:'在接下来的对话中无论我用什么语言提问，你都需要用中文回答，明白了吗'
+        },
+        {
+            role:'model',
+            parts:'明白了'
+        },],
+    generationConfig:{maxOutputTokens:100000}}
     chat:ChatSession
     safetySettings:SafetySetting[] = [
         {
@@ -62,17 +74,18 @@ export class GeminiClient{
         return undefined
     }
 
-    async longDilogue(prompt:string):Promise<string>{
+    async longDilogue(prompt:string,ctx:Context):Promise<string|Buffer>{
         try{
             const result:GenerateContentResult = await this.chat.sendMessage(prompt)
             const response:EnhancedGenerateContentResponse = await result.response
             console.log(response.promptFeedback.safetyRatings)
             const reply = response.text()
-            // console.log('*************下面是response*************')
-            // console.log(response)
-            // console.log('*************下面是history*************')
-            // console.log(ch.history)
-            return reply
+            if(reply.length<100){
+                return reply
+            }
+            else{
+                return await getScreenShot(reply,ctx)
+            }
         }
         catch(e){
             console.log(e)
