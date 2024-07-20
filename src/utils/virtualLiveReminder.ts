@@ -10,7 +10,7 @@ import test from "node:test";
 
 let virtualLiveList:SekaiVirtualLive[];
 const virtualLiveJsonDataUrl:string = 'https://sekai-world.github.io/sekai-master-db-diff//virtualLives.json';
-const assetUrl:string = 'https://storage.sekai.best/sekai-assets/virtual_live/select/banner';
+const assetUrl:string = 'https://storage.sekai.best/sekai-jp-assets/virtual_live/select/banner';
 let lastUpdateTime:number = Date.now()-11*60*1000;
 
 
@@ -76,6 +76,22 @@ export async function checkVirtualLives(ctx:Context,channel:Channel[]){
     if(cvl){
         for(let i = 0;i<cvl.length;i++){
             const tempvl = cvl[i];
+            let remindText = ''
+            switch(tempvl.virtualLiveType){
+                case 'normal':
+                    if(tempvl.name.includes('BIRTHDAY')){
+                        remindText = '记得领生日牌和歌券哦'
+                    }
+                    else{
+                        remindText = '别忘了拿300石头哦'
+                    }
+                    break
+                case 'cheerful_carnival':
+                    remindText = '别忘了拿300石头哦'
+                    break
+                default:
+                    continue
+            }
             //判断数据库中是否存在当前活动
             const data:VirtualLive[] = await ctx.database.get('virtualLive',tempvl.id);
             if(data.length==0){
@@ -99,11 +115,12 @@ export async function checkVirtualLives(ctx:Context,channel:Channel[]){
                 });
             }
             else{
-                const now = Date.now()+1000*60*5;
+                const now = Date.now()
                 const scheduleList = data[0].virtualLiveSchedules;
                 for(let j=0;j<scheduleList.length;j++){
                     const tempTime:number = Number(scheduleList[j].startAt);
-                    if(now>tempTime&&now<Number(scheduleList[j].endAt)&&scheduleList[j].reminded==false){//当前时间大于开始时间时提醒（提前了五分钟）
+                    const timeInterval = tempTime-now;
+                    if(timeInterval < 300000 && timeInterval > 0 && now<Number(scheduleList[j].endAt) && scheduleList[j].reminded==false){//当前时间大于开始时间时提醒（提前了五分钟）
                         let messageList = [];
                         try{
                             const url = `${assetUrl}/${tempvl.assetbundleName}_rip/${tempvl.assetbundleName}.png`;
@@ -114,7 +131,7 @@ export async function checkVirtualLives(ctx:Context,channel:Channel[]){
                         catch(e){
                             console.error('获取LiveBanner失败');
                         }
-                        messageList.push(`Title: ${tempvl.name}\n该演唱会快要开始了，别忘了拿300石头哦`);
+                        messageList.push(`Title: ${tempvl.name}\n该演唱会快要开始了，${remindText}`);
                         sendRemindMessage(ctx,channel,messageList);
                         //更新数据库内信息
                         scheduleList[j].reminded=true;

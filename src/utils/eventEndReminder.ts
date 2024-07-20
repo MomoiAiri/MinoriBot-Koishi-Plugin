@@ -3,7 +3,7 @@ import { SekaiEvent } from '../types/SekaiEvent';
 import { Channel, Context, h } from 'koishi';
 import { sendRemindMessage } from './virtualLiveReminder';
 const eventJsonDataUrl:string = 'https://sekai-world.github.io/sekai-master-db-diff//events.json';
-const assetUrl:string = 'https://storage.sekai.best/sekai-assets/home/banner';
+const assetUrl:string = 'https://storage.sekai.best/sekai-jp-assets/home/banner';
 let sekaiEventList:SekaiEvent[] = []
 let lastUpdateTime:number = Date.now()-11*60*1000;
 async function getEventList(){
@@ -64,7 +64,7 @@ export async function checkEventEndTime(ctx:Context,channel:Channel[]){
             ctx.database.create('projectSekaiData',{event:ce})
         }
         const now = Date.now() + 1000*60*60
-        if(now > ce.aggregateAt){
+        if(now > ce.aggregateAt && eventInDatabase[eventIndex].event.isReminded == false){
             let messageList = []
             try{
                 const url = `${assetUrl}/${ce.assetbundleName}_rip/${ce.assetbundleName}.png`

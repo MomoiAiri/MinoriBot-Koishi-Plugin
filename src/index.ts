@@ -9,22 +9,23 @@ import { text } from 'stream/consumers'
 import { GeminiClient } from './command/gemini'
 import moment from 'moment'
 import Puppeteer from 'koishi-plugin-puppeteer'
-import Colors = require('colors.ts');
 import { commandGacha } from './command/searchGacha'
 import { SekaiEvent } from './types/SekaiEvent'
 import { checkEventEndTime } from './utils/eventEndReminder'
 require('./utils/virtualLiveReminder')
 
-Colors.theme({
-  red:"red",
-  green:"green",
-  blue:"blue",
-  lightblue:"lightblue",
-  pink:"pink",
-})
+// Colors.theme({
+//   red:"red",
+//   green:"green",
+//   blue:"blue",
+//   lightblue:"lightblue",
+//   pink:"pink",
+// })
 
 export const name = 'minoribot'
-export const inject = ['puppeteer']
+export const inject = {
+  optional:['puppeteer', 'database']
+}
 const isInterval = true
 
 declare module 'koishi'{
@@ -77,6 +78,8 @@ export const Config: Schema<Config> = Schema.object({
 
 export function apply(ctx: Context,config: Config) {
   // write your plugin here
+  console.log('blueText'.color('#0000FF'))
+
   context = ctx
   async function interval(){
     if(isInterval){
@@ -86,7 +89,7 @@ export function apply(ctx: Context,config: Config) {
     }
   }
   ctx.setInterval(interval,60*1000);
-
+  
   function init(){
     if(config.gemini_APIKey!=''){
       gemini = new GeminiClient(config.gemini_APIKey,config.gemini_proxy)
@@ -120,12 +123,13 @@ export function apply(ctx: Context,config: Config) {
   })
 
   ctx.middleware((session,next)=>{
-    const messageTime:string = `[${moment(new Date()).format('YYYY-MM-DD HH:mm')}]`.colors('#99eedd');
-    const userName = (session.event.user.name?session.event.user.name:session.event.member.nick).colors('#ffccaa')
+    const messageTime:string = `[${moment(new Date()).format('YYYY-MM-DD HH:mm')}]`.color('#99eedd');
+    const userName = (session.event.user.name?session.event.user.name:session.event.member.nick).color('#ffccaa')
     const content = replaceImgTags(session.content)
-    console.log(`${messageTime}[${session.channelId.colors('#99ccff')}][${session.event.channel.name.toString().colors('#ffaacc')}][${userName}]${content}`)
+    console.log(`${messageTime}[${session.channelId.color('#99ccff')}][${session.event.channel.name.toString().color('#ffaacc')}][${userName}]${content}`)
     return next();
   })
+
 
   ctx.command('interval')
   .action(({session})=> {

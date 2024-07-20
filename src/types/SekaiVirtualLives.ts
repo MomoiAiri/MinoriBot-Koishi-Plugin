@@ -14,7 +14,7 @@ export class SekaiVirtualLive{
     }[]
 
     getLiveBannerAssetUrl(assetUrl:string):string{
-        this.liveBannerAssetUrl = `${assetUrl}/sekai-assets/virtual_live/select/banner/${this.assetbundleName}_rip/${this.assetbundleName}.png`;
+        this.liveBannerAssetUrl = `${assetUrl}/sekai-jp-assets/virtual_live/select/banner/${this.assetbundleName}_rip/${this.assetbundleName}.png`;
         return this.liveBannerAssetUrl;
     }
 }
